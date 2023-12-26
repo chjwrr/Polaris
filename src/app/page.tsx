@@ -49,6 +49,7 @@ export default function Home() {
   const [successCount, setSuccessCount] = useState<number>(0);
   const [gasRadio, setGasRadio] = useState<GasRadio>("tip");
 
+  // 每笔交易的结果
   const pushLog = useCallback((log: string, state?: string) => {
     setLogs((logs) => [
       handleLog(log, state),
@@ -56,37 +57,43 @@ export default function Home() {
     ]);
   }, []);
 
+  // 通过 链 + RPC 得到一个钱包对象，通过此对象发送交易
   const client = createWalletClient({
     chain,
     transport: rpc && rpc.startsWith("wss") ? webSocket(rpc) : http(rpc),
   });
+
+  // 通过私钥得到账户
   const accounts = privateKeys.map((key) => privateKeyToAccount(key));
 
+  // 每多少秒调用一次
   useInterval(
     async () => {
       const results = await Promise.allSettled(
         accounts.map((account) => {
+          // 发送交易
           return client.sendTransaction({
             account,
             to: radio === "meToMe" ? account.address : toAddress,
             value: 0n,
             ...(inscription
               ? {
-                  data: stringToHex(inscription),
-                }
+                data: stringToHex(inscription),
+              }
               : {}),
             ...(gas > 0
               ? gasRadio === "all"
                 ? {
-                    gasPrice: parseEther(gas.toString(), "gwei"),
-                  }
+                  gasPrice: parseEther(gas.toString(), "gwei"),
+                }
                 : {
-                    maxPriorityFeePerGas: parseEther(gas.toString(), "gwei"),
-                  }
+                  maxPriorityFeePerGas: parseEther(gas.toString(), "gwei"),
+                }
               : {}),
           });
         }),
       );
+      // 得到交易结果存入log
       results.forEach((result, index) => {
         const address = handleAddress(accounts[index].address);
         if (result.status === "fulfilled") {
@@ -275,9 +282,8 @@ export default function Home() {
         <TextField
           type="number"
           size="small"
-          placeholder={`${
-            gasRadio === "tip" ? "默认 0" : "默认最新"
-          }, 单位 gwei，例子: 10`}
+          placeholder={`${gasRadio === "tip" ? "默认 0" : "默认最新"
+            }, 单位 gwei，例子: 10`}
           disabled={running}
           onChange={(e) => {
             const num = Number(e.target.value);
